@@ -208,7 +208,7 @@ def bkgsub(directory, img, log, output_dir, suffix, plot_sky=False):
 
     log.info('finished: %s' % img)
 
-def cleanup_intermediate_files(output_dir, image_filename, log):
+def cleanup_intermediate_files(output_dir, image_filename, suffix, log):
     base_filename = os.path.basename(image_filename).replace(f'_cal{suffix}.fits', '')
     intermediate_files = [
         os.path.join(output_dir, base_filename + '_cal_bkgsub1.fits'),
@@ -226,7 +226,7 @@ def process_file(args):
     directory, output_dir, img, plot_sky, suffix, log, log_file_path = args
     try:
         bkgsub(directory, img, log, output_dir, suffix, plot_sky)
-        cleanup_intermediate_files(directory, img, log)
+        cleanup_intermediate_files(directory, img, suffix, log)
     except Exception as e:
         log_error(log, f"Error in process_file for {img}", exc=e)
         with open(log_file_path, "a") as f:
