@@ -3,6 +3,7 @@ import glob
 import sys
 from astropy.io import fits
 import yaml
+from config_utils import load_config
 
 def get_observation_info(data_dir, dir_prefix="MAST_", combine=False, group_by_directory=False, name="Combined_Mosaic"):
     """
@@ -32,9 +33,8 @@ def get_observation_info(data_dir, dir_prefix="MAST_", combine=False, group_by_d
             # Group files by their parent directory
             parent_dirs = set(os.path.dirname(file) for file in uncal_files)
             for parent_dir in parent_dirs:
-                # Extract the first subdirectory under the working directory
-                first_subdir = os.path.relpath(parent_dir, data_dir).split(os.sep)[0]
-                obs_name = f"Output_{first_subdir}".replace(" ", "_").replace(".", "_")
+                uncal_dir_name = os.path.basename(parent_dir)
+                obs_name = f"Output_{uncal_dir_name}".replace(" ", "_").replace(".", "_")
 
                 files_in_dir = [file for file in uncal_files if os.path.dirname(file) == parent_dir]
                 obs_info.append((obs_name, ",".join(files_in_dir)))
@@ -68,10 +68,7 @@ def get_observation_info(data_dir, dir_prefix="MAST_", combine=False, group_by_d
 
 if __name__ == "__main__":
     pipeline_dir = sys.argv[1] if len(sys.argv) > 1 else "."
-    config_file = os.path.join(pipeline_dir, "config.yaml")
-    # Read combine_observations from config
-    with open(config_file, "r") as file:
-        config = yaml.safe_load(file)
+    config, _ = load_config(os.path.join(pipeline_dir, "config.yaml"))
 
     data_dir = config.get("data_directory")
     combine_observations = config.get("combine_observations", False)

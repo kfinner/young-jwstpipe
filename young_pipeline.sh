@@ -1,7 +1,7 @@
 #!/bin/bash
 START_TIME_TOTAL=$(date +%s)
 
-CONFIG_FILE="config.yaml"
+CONFIG_FILE="${YOUNG_PIPELINE_CONFIG:-config.yaml}"
 
 DATA_DIR_FROM_YAML=$(yq '.data_directory // ""' "$CONFIG_FILE" | tr -d '"')
 DATA_DIR=${DATA_DIR_FROM_YAML:-$(dirname "$(realpath "$0")")}

@@ -7,10 +7,10 @@ import logging
 import sys
 import argparse
 from multiprocessing import Pool, cpu_count
+from config_utils import load_config
 
 # Load configuration
-with open('config.yaml', 'r') as config_file:
-    config = yaml.safe_load(config_file)
+config, _ = load_config()
 
 os.environ['CRDS_PATH'] = config['crds_path']
 os.environ['CRDS_SERVER_URL'] = config['crds_server_url']

@@ -14,12 +14,12 @@ from tqdm.auto import tqdm
 import logging
 import yaml
 import warnings
+from config_utils import load_config
 warnings.simplefilter("ignore", category=RuntimeWarning)
 
 
 
-with open('config.yaml', 'r') as config_file:
-    config = yaml.safe_load(config_file)
+config, _ = load_config()
 
 def setup_logger(output_dir):
     """

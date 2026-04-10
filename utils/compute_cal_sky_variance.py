@@ -20,9 +20,9 @@ from os import path
 import logging
 import yaml
 import os
+from config_utils import load_config
 
-with open('config.yaml', 'r') as config_file:
-    config = yaml.safe_load(config_file)
+config, _ = load_config()
 
 @dataclass
 class ScaledVariance:

@@ -39,11 +39,11 @@ from astropy.wcs import WCS
 import yaml
 import os
 #import dill # Just for debugging
+from config_utils import load_config
 
 # Set up logging
 
-with open('config.yaml', 'r') as config_file:
-    config = yaml.safe_load(config_file)
+config, _ = load_config()
 
 def setup_logger(output_dir):
     """

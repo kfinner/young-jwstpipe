@@ -59,9 +59,9 @@ import numpy as np
 from photutils.segmentation import detect_sources, detect_threshold
 from scipy.ndimage import binary_dilation, generate_binary_structure
 from tqdm.auto import tqdm
+from config_utils import load_config
 
-with open('config.yaml', 'r') as config_file:
-    config = yaml.safe_load(config_file)
+config, _ = load_config()
 
 def setup_logger(output_dir):
     """

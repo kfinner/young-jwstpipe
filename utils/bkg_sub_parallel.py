@@ -16,9 +16,9 @@ import matplotlib.pyplot as plt
 from multiprocessing import Pool, cpu_count
 from tqdm.auto import tqdm
 import argparse
+from config_utils import load_config
 
-with open('config.yaml', 'r') as config_file:
-    config = yaml.safe_load(config_file)
+config, _ = load_config()
 
 def setup_logger(output_dir):
     """

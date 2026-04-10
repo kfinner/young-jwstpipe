@@ -35,7 +35,7 @@ simplify the execution of the various stages of the pipeline.
 
 Installation instructions can be found on the [JWST Calibration Pipeline site](https://jwst-pipeline.readthedocs.io/en/latest/), along with other information about the default pipeline.
 
-It is also necessary to have the command-line YAML processor [`yq`](https://pypi.org/project/yq/) installed, as well as the packages [`psutil`](https://anaconda.org/conda-forge/psutil/) and [`tqdm`](https://anaconda.org/conda-forge/tqdm/).
+It is also necessary to have the command-line YAML processor [`yq`](https://pypi.org/project/yq/) installed, as well as the packages [`psutil`](https://anaconda.org/conda-forge/psutil/), [`tqdm`](https://anaconda.org/conda-forge/tqdm/), and [`astroquery`](https://astroquery.readthedocs.io/en/latest/) if you want to use the target-download wrapper described below.
 
 The wisp templates necessary for the wisp correction step can be found [here](https://stsci.app.box.com/s/1bymvf1lkrqbdn9rnkluzqk30e8o2bne/folder/275049066832?page=2).  
 These are the version 3 templates provided in the [JWST documentation](https://jwst-docs.stsci.edu/known-issues-with-jwst-data/nircam-known-issues/nircam-scattered-light-artifacts#gsc.tab=0).  
@@ -93,6 +93,38 @@ $ ./young_pipeline.sh
 ```
 
 Once the pipeline execution begins, a new directory will be created (`output_directory/program`) which will contain the output from all stages of the pipeline. Additionally, log files (.log) will be created to keep track of the detailed output from the pipeline. For Stage 3 processing, log files will be located in the final filter directories.
+
+### Download by target name, then reduce
+
+If you want the pipeline to resolve target names in MAST, download the required `_uncal.fits` inputs, and then launch the reduction, use:
+
+```bash
+$ python download_and_reduce.py "Abell 2744"
+```
+
+You can also pass multiple targets directly or from a file:
+
+```bash
+$ python download_and_reduce.py "Abell 2744" "SMACS J0723.3-7327"
+$ python download_and_reduce.py --targets-file targets.txt
+```
+
+This wrapper currently:
+
+- queries **public JWST NIRCam imaging** observations for each target,
+- downloads the corresponding `*_uncal.fits` products from MAST,
+- stages them into a layout compatible with the existing pipeline,
+- creates a temporary config using your base `config.yaml`,
+- runs `young_pipeline.sh` with that generated config.
+
+Helpful options:
+
+- `--skip-pipeline` downloads and stages data without running the reduction.
+- `--skip-download` reuses previously cached downloads.
+- `--output-dir /path/to/output` overrides `output_directory` for that run only.
+
+> **Note:**  
+> The current reduction pipeline is NIRCam imaging-specific, so the wrapper only selects **JWST NIRCam image** products with the `UNCAL` subgroup.
 
 ## Acknowledgements
 
