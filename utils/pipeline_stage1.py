@@ -11,6 +11,8 @@ from multiprocessing import Pool, cpu_count
 from contextlib import contextmanager
 from config_utils import load_config
 
+MAX_PARALLEL_WORKERS = int(os.environ.get("YOUNG_PIPELINE_MAX_PARALLEL", "8"))
+
 @contextmanager
 def redirect_output_to_file(log_file):
     """Temporarily redirect stdout and stderr to a log file."""
@@ -64,6 +66,9 @@ def process_file(args):
             Detector1Pipeline.call(
                 img,
                 steps={
+                    'clean_flicker_noise': {'skip': True},
+                    'refpix': {'refpix_algorithm': 'median'},
+                    'dark_current': {'skip': True},
                     'ramp_fit': {'maximum_cores': config['ramp_fit_cores']},
                     'jump': {'maximum_cores': config['jump_cores']}
                 },
@@ -72,6 +77,21 @@ def process_file(args):
             )
     except Exception as e:
         log.error(f"Failed to process {img}: {e}")
+
+
+def get_effective_nproc(requested_nproc, task_count, log):
+    """Clamp worker count to a tested-safe maximum for modern JWST stacks."""
+    if task_count == 0:
+        return 0
+
+    effective_nproc = min(requested_nproc, task_count, MAX_PARALLEL_WORKERS)
+    if effective_nproc < requested_nproc:
+        log.info(
+            "Capping Stage 1 parallel workers from %s to %s for runtime stability.",
+            requested_nproc,
+            effective_nproc,
+        )
+    return effective_nproc
 
 def main(combined_mode, input_dir, output_dir, nproc, log):
     if combined_mode:
@@ -89,8 +109,9 @@ def main(combined_mode, input_dir, output_dir, nproc, log):
         print(f"Output directory created: {output_dir}")
 
     task_args = [(img, output_dir, log, log_file_path) for img in uncal_list]
+    effective_nproc = get_effective_nproc(nproc, len(task_args), log)
 
-    if nproc == 1:
+    if effective_nproc <= 1:
         # Sequential processing for single-core execution
         with tqdm(total=len(task_args), file=sys.stderr) as pbar:
             for args in task_args:
@@ -98,8 +119,6 @@ def main(combined_mode, input_dir, output_dir, nproc, log):
                 pbar.update(1)
 
     else:
-        num_files = len(uncal_list)
-        effective_nproc = min(nproc, num_files)
         with Pool(processes=effective_nproc) as pool:
             with tqdm(total=len(task_args), file=sys.stdout) as pbar:
                 for _ in pool.imap_unordered(process_file, task_args):

@@ -9,6 +9,8 @@ import argparse
 from multiprocessing import Pool, cpu_count
 from config_utils import load_config
 
+MAX_PARALLEL_WORKERS = int(os.environ.get("YOUNG_PIPELINE_MAX_PARALLEL", "8"))
+
 # Load configuration
 config, _ = load_config()
 
@@ -63,6 +65,21 @@ def process_file(args):
     except Exception as e:
         log.error(f"Failed to process {img}: {e}")
 
+
+def get_effective_nproc(requested_nproc, task_count, log):
+    """Clamp worker count to a tested-safe maximum for modern JWST stacks."""
+    if task_count == 0:
+        return 0
+
+    effective_nproc = min(requested_nproc, task_count, MAX_PARALLEL_WORKERS)
+    if effective_nproc < requested_nproc:
+        log.info(
+            "Capping Stage 2 parallel workers from %s to %s for runtime stability.",
+            requested_nproc,
+            effective_nproc,
+        )
+    return effective_nproc
+
 def main(input_dir, output_dir, nproc, log, log_file_path):
     # Get the list of rate.fits files
     file_list = os.listdir(input_dir)
@@ -76,7 +93,18 @@ def main(input_dir, output_dir, nproc, log, log_file_path):
         print(f"Output directory created: {output_dir}")
 
     task_args = [(os.path.join(input_dir, img), output_dir, log, log_file_path) for img in rate_list]
-    effective_nproc = min(nproc, len(task_args))
+    effective_nproc = get_effective_nproc(nproc, len(task_args), log)
+    if effective_nproc == 0:
+        raise FileNotFoundError(f"No rate.fits files found in {input_dir}")
+
+    if effective_nproc == 1:
+        with tqdm(total=len(task_args), file=sys.stdout) as pbar:
+            for args in task_args:
+                process_file(args)
+                pbar.update(1)
+        log.info("Pipeline completed successfully.")
+        return
+
     with Pool(processes=effective_nproc) as pool:
         with tqdm(total=len(task_args), file=sys.stdout) as pbar:
             for _ in pool.imap_unordered(process_file, task_args):

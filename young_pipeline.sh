@@ -1,4 +1,6 @@
 #!/bin/bash
+set -eo pipefail
+
 START_TIME_TOTAL=$(date +%s)
 
 CONFIG_FILE="${YOUNG_PIPELINE_CONFIG:-config.yaml}"
@@ -29,6 +31,22 @@ delete_directory_if_exists() {
     fi
 }
 
+archive_log_if_exists() {
+    local log_file="$1"
+    if [ -f "$log_file" ]; then
+        local archive_dir
+        local base_name
+        local timestamp
+        archive_dir="$(dirname "$log_file")/archive"
+        base_name="$(basename "$log_file" .log)"
+        timestamp="$(date +%Y%m%d_%H%M%S)"
+        mkdir -p "$archive_dir"
+        mv "$log_file" "$archive_dir/${base_name}_${timestamp}.log"
+        echo "[Archived existing $(basename "$log_file") to $archive_dir/${base_name}_${timestamp}.log]"
+        echo ""
+    fi
+}
+
 delete_stage3_directory_if_exists() {
     local dir="$1"
     local suffix="$2"
@@ -54,6 +72,19 @@ restore_stage2_files() {
     done
 
     echo "Files restored and renamed successfully."
+}
+
+cleanup_intermediate_products() {
+    local obs_dir="$1"
+
+    if [ -d "$obs_dir/stage3_output" ]; then
+        find "$obs_dir/stage3_output" -type f -name '*_asn_crf.fits' -delete
+        echo "[Deleted Stage 3 intermediate *_asn_crf.fits files.]"
+        echo ""
+    fi
+
+    delete_directory_if_exists "$obs_dir/stage1_output"
+    delete_directory_if_exists "$obs_dir/stage2_output"
 }
 
 
@@ -122,11 +153,7 @@ run_pipeline() {
     fi
 
     if ! should_skip_step "stage1"; then
-        if [ -f "$LOG_FILE1" ]; then
-            echo "[Existing pipeline_stage1.log file deleted]"
-            echo ""
-            rm "$LOG_FILE1"
-        fi
+        archive_log_if_exists "$LOG_FILE1"
         delete_directory_if_exists "$OBS_DIR/stage1_output"
         echo "==================="
         echo " Pipeline: stage 1 "
@@ -146,11 +173,7 @@ run_pipeline() {
     fi
 
     if ! should_skip_step "fnoise_correction"; then
-        if [ -f "$LOG_FILEF" ]; then
-            echo "[Existing pipeline_fnoise.log file deleted]"
-            echo ""
-            rm "$LOG_FILEF"
-        fi
+        archive_log_if_exists "$LOG_FILEF"
         echo "« Correcting 1/f noise »"
         echo "  ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯  "
         echo "Accessing flat files before beginning calibration..."
@@ -176,11 +199,7 @@ run_pipeline() {
     fi
 
     if ! should_skip_step "stage2"; then
-        if [ -f "$LOG_FILE2" ]; then
-            echo "[Existing pipeline_stage2.log file deleted]"
-            echo ""
-            rm "$LOG_FILE2"
-        fi
+        archive_log_if_exists "$LOG_FILE2"
         delete_directory_if_exists "$OBS_DIR/stage2_output"
         echo "===================="
         echo " Pipeline - stage 2 "
@@ -193,11 +212,7 @@ run_pipeline() {
     fi
 
     if ! should_skip_step "wisp_subtraction"; then
-        if [ -f "$LOG_FILEW" ]; then
-            echo "[Existing pipeline_wisp.log file deleted]"
-            echo ""
-            rm "$LOG_FILEW"
-        fi
+        archive_log_if_exists "$LOG_FILEW"
         echo "« Subtracting wisps from exposures »"
         echo "  ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯  "
         python "$PIPELINE_DIR/utils/subtract_wisp.py" --files $OBS_DIR/stage2_output/jw*cal.fits --wisp_dir "$WISP_DIR" --output_dir "$OBS_DIR/stage2_output" --suffix "_wisp" --nproc "$WISP_NPROC"
@@ -208,11 +223,7 @@ run_pipeline() {
     fi
 
     if ! should_skip_step "cal_fnoise_reduction"; then
-        if [ -f "$LOG_FILECF" ]; then
-            echo "[Existing pipeline_cfnoise.log file deleted]"
-            echo ""
-            rm "$LOG_FILECF"
-        fi
+        archive_log_if_exists "$LOG_FILECF"
         echo "« Reducing 1/f noise in exposures »"
         echo "  ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯  "
 
@@ -235,11 +246,7 @@ run_pipeline() {
     fi
 
     if ! should_skip_step "background_subtraction"; then
-        if [ -f "$LOG_FILEB" ]; then
-            echo "[Existing pipeline_bkg.log file deleted]"
-            echo ""
-            rm "$LOG_FILEB"
-        fi
+        archive_log_if_exists "$LOG_FILEB"
         echo "« Subtracting background from exposures »"
         echo "  ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯  "
 
@@ -285,11 +292,7 @@ run_pipeline() {
     fi
 
     if ! should_skip_step "stage3"; then
-        if [ -f "$LOG_FILE3" ]; then
-            echo "[Existing pipeline_stage3.log file deleted]"
-            echo ""
-            rm "$LOG_FILE3"
-        fi
+        archive_log_if_exists "$LOG_FILE3"
         delete_stage3_directory_if_exists "$OBS_DIR/stage3_output"
         echo "===================="
         echo " Pipeline - stage 3"
@@ -300,6 +303,8 @@ run_pipeline() {
         echo "[Pipeline Stage 3 skipped]"
         echo ""
     fi
+
+    cleanup_intermediate_products "$OBS_DIR"
 
     echo "===================="
     echo " Pipeline completed "

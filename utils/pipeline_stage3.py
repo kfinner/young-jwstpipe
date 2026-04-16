@@ -21,6 +21,16 @@ config, _ = load_config()
 os.environ['CRDS_PATH'] = config['crds_path']
 os.environ['CRDS_SERVER_URL'] = config['crds_server_url']
 
+
+def archive_existing_log(log_file_path):
+    """Preserve a prior log from an earlier run instead of overwriting it."""
+    if not os.path.exists(log_file_path):
+        return
+
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    archive_path = log_file_path.replace(".log", f"_{timestamp}.log")
+    shutil.move(log_file_path, archive_path)
+
 def setup_logger(output_dir):
     """
     Setup a logger for the pipeline using the provided output directory.
@@ -67,11 +77,13 @@ def setup_logger(output_dir):
 def setup_filter_logger(filter_dir):
     filter_name = os.path.basename(filter_dir)
     log_file_path = os.path.join(filter_dir, f"stage3_{filter_name}.log")
+    archive_existing_log(log_file_path)
 
     log_filter = logging.getLogger(f"filter_logger_{filter_name}")
     log_filter.setLevel(logging.DEBUG)
+    log_filter.handlers.clear()
 
-    file_handler = logging.FileHandler(log_file_path, mode='w')
+    file_handler = logging.FileHandler(log_file_path, mode='a')
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     file_handler.setFormatter(formatter)
 
@@ -96,6 +108,8 @@ def setup_filter_logger(filter_dir):
         for handler in logger.handlers:
             if isinstance(handler, logging.StreamHandler):
                 logger.removeHandler(handler)
+
+    log_filter.info("Writing detailed Stage 3 filter log to %s", log_file_path)
     return log_filter
 
 def process_filter(filter_dir, log, target, long_cat, long_params, extract_settings, config):
@@ -390,6 +404,7 @@ if __name__ == "__main__":
         log.info('No reference catalog provided, no absolute astrometric fitting performed.')
     log.info('Running stage 3 for the longest wavelength first...')
     print('Running stage 3 for the longest wavelength first...')
+    log.info('Detailed Stage 3 filter logs will be written inside each filter directory as stage3_<FILTER>.log.')
 
     log_long_filter = setup_filter_logger(sorted_filter_dirs[0])
     stage3(sorted_filter_dirs[0], log_long_filter, target, reference_catalog=ref_cat, resample_params=None, config=config)
