@@ -99,7 +99,7 @@ PRESETS = {
         "stretch": 6.0,
         "power": 0.4,
         "gamma": 1.0,
-        "brightness": 1.15,
+        "brightness": 1.2,
         "highlight_rolloff": 1.0,
         "highlight_strength": 0.0,
     },
